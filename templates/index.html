@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>VMPS — Dashboard | Vehicle Maintenance Prediction System</title>
+<meta name="description" content="AI-powered vehicle maintenance prediction dashboard with real-time analytics."/>
+<link rel="stylesheet" href="/static/css/style.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<canvas id="particles"></canvas>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loader"></div>
+  <div class="loader-text" id="loading-text">ANALYZING VEHICLE DATA...</div>
+</div>
+
+<!-- ALERT PANEL -->
+<div class="alert-panel" id="alert-panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div class="section-title">🔔 Alerts</div>
+    <button onclick="toggleAlerts()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.1rem;">✕</button>
+  </div>
+  <div id="alerts-list"><div style="color:var(--text-secondary);font-size:0.82rem;text-align:center;padding:20px;">Loading alerts...</div></div>
+</div>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-brand">VMPS <span>Vehicle Maintenance Prediction System</span></div>
+  <div class="nav-actions">
+    <span class="nav-user" id="nav-username">👤 {{ username }}</span>
+    <button class="dark-toggle" onclick="toggleDark()" id="dark-toggle-btn">🌙 Dark</button>
+    <div class="alert-bell" onclick="toggleAlerts()" title="Alerts">
+      🔔
+      <div class="alert-badge" id="alert-count">0</div>
+    </div>
+    <button class="btn-nav" onclick="doLogout()">Sign Out</button>
+  </div>
+</nav>
+
+<!-- MAIN WRAPPER -->
+<div class="main-wrapper">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <div class="sidebar-item active" onclick="showSection('dashboard')" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="sidebar-item" onclick="showSection('predict')" id="nav-predict">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        AI Prediction
+      </div>
+      <div class="sidebar-item" onclick="showSection('analytics')" id="nav-analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Analytics
+      </div>
+      <div class="sidebar-item" onclick="showSection('vehicles')" id="nav-vehicles">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        My Vehicles
+      </div>
+      <div class="sidebar-item" onclick="showSection('recommendations')" id="nav-recommendations">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Recommendations
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">System</div>
+      <div class="sidebar-item" onclick="showSection('history')" id="nav-history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M8 12h8M8 8h8M8 16h5"/></svg>
+        History
+      </div>
+      <div class="sidebar-item" onclick="exportCurrentReport()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export PDF
+      </div>
+    </div>
+
+    <!-- Active vehicle info -->
+    <div class="sep"></div>
+    <div id="sidebar-vehicle-info" style="display:none;">
+      <div class="sidebar-label">Active Vehicle</div>
+      <div style="background:rgba(0,212,255,0.06);border:1px solid var(--glass-border);border-radius:10px;padding:12px;">
+        <div id="sv-number" style="font-family:'Orbitron',monospace;font-size:0.85rem;color:var(--neon-blue);margin-bottom:4px;"></div>
+        <div id="sv-model" style="font-size:0.78rem;color:var(--text-secondary);"></div>
+        <div id="sv-health" style="margin-top:8px;font-size:0.78rem;"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CONTENT -->
+  <main class="content">
+
+    <!-- ══ DASHBOARD SECTION ══ -->
+    <section id="section-dashboard">
+      <div class="section-header" style="margin-bottom:20px;">
+        <div style="font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:900;background:linear-gradient(90deg,var(--neon-blue),var(--electric-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+          AI Command Center
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-secondary);">Real-time vehicle health monitoring</div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card stat-blue glass-card">
+          <div class="stat-label">Total Vehicles</div>
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-sub">Monitored units</div>
+        </div>
+        <div class="stat-card stat-green glass-card">
+          <div class="stat-label">Fleet Health</div>
+          <div class="stat-value" id="stat-health">—</div>
+          <div class="stat-sub">Average score</div>
+        </div>
+        <div class="stat-card stat-orange glass-card">
+          <div class="stat-label">Needs Attention</div>
+          <div class="stat-value" id="stat-critical">—</div>
+          <div class="stat-sub">Critical / High risk</div>
+        </div>
+        <div class="stat-card stat-purple glass-card">
+          <div class="stat-label">Operational</div>
+          <div class="stat-value" id="stat-ok">—</div>
+          <div class="stat-sub">Healthy vehicles</div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="two-col" style="margin-bottom:20px;">
+        <div class="glass-card" style="padding:20px;">
+          <div class="section-header">
+            <div class="section-title">Health Trend</div>
+          </div>
+          <div class="chart-container"><canvas id="chart-health-trend"></canvas></div>
+        </div>
+        <div class="glass-card" style="padding:20px;">
+          <div class="section-header">
+            <div class="section-title">Risk Distribution</div>
+          </div>
+          <div class="chart-container"><canvas id="chart-risk-pie"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Vehicle Chips + Quick Overview -->
+      <div class="glass-card" style="padding:20px;margin-bottom:20px;">
+        <div class="section-header">
+          <div class="section-title">Fleet Overview</div>
+          <button class="btn-secondary" onclick="showSection('predict')">+ Add Vehicle</button>
+        </div>
+        <div class="vehicle-chips" id="fleet-chips">
+          <div style="color:var(--text-secondary);font-size:0.82rem;padding:8px;">Loading vehicles...</div>
+        </div>
+        <div id="fleet-detail" style="display:none;margin-top:16px;">
+          <div class="sep"></div>
+          <div class="two-col" style="margin-top:16px;">
+            <div>
+              <div class="health-gauge-wrap">
+                <div class="gauge-ring">
+                  <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle class="gauge-bg" cx="80" cy="80" r="65"/>
+                    <circle class="gauge-fill" id="fleet-gauge-fill" cx="80" cy="80" r="65" stroke="url(#gaugeGrad)" stroke-dasharray="408.41" stroke-dashoffset="408.41"/>
+                    <defs>
+                      <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#00d4ff"/>
+                        <stop offset="100%" stop-color="#8b5cf6"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div class="gauge-center">
+                    <div class="gauge-value" id="fleet-gauge-value" style="color:var(--neon-blue);">--</div>
+                    <div class="gauge-label">Health %</div>
+                  </div>
+                </div>
+                <div id="fleet-risk-badge"></div>
+                <div id="fleet-urgency" style="font-size:0.78rem;color:var(--text-secondary);"></div>
+              </div>
+            </div>
+            <div>
+              <div id="fleet-sensor-bars"></div>
+              <div style="margin-top:12px;">
+                <div id="fleet-status-info"></div>
+                <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                  <button class="btn-primary" id="btn-run-prediction" style="font-size:0.8rem;padding:9px 16px;" onclick="runPredictionForSelected()">⚡ Run AI Analysis</button>
+                  <button class="btn-secondary" style="font-size:0.8rem;padding:8px 14px;" onclick="exportSelectedReport()">📄 Export PDF</button>
+                  <button class="btn-danger" style="font-size:0.78rem;" onclick="deleteSelected()">🗑 Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ AI PREDICTION SECTION ══ -->
+    <section id="section-predict" style="display:none;">
+      <div class="section-header" style="margin-bottom:20px;">
+        <div style="font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:900;color:var(--neon-blue);">AI Prediction Engine</div>
+        <div style="font-size:0.8rem;color:var(--text-secondary);">Enter vehicle diagnostics for ML-powered analysis</div>
+      </div>
+
+      <div class="main-grid">
+        <!-- FORM -->
+        <div class="glass-card" style="padding:24px;">
+          <div class="section-title" style="margin-bottom:20px;">Vehicle Input Form
+            <button class="voice-btn" id="voice-btn" onclick="toggleVoice()" title="Voice input" style="margin-left:auto;font-size:0.85rem;padding:6px 12px;">🎤 Voice</button>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="f-number">Vehicle Number *</label>
+              <input class="form-control" id="f-number" type="text" placeholder="MH-01-AB-1234"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-model">Vehicle Model *</label>
+              <input class="form-control" id="f-model" type="text" placeholder="Model S, Civic..."/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-manufacturer">Manufacturer *</label>
+              <select class="form-control" id="f-manufacturer">
+                <option value="">Select manufacturer</option>
+                <option>Tesla</option><option>Toyota</option><option>Honda</option>
+                <option>BMW</option><option>Ford</option><option>Mercedes</option>
+                <option>Hyundai</option><option>Kia</option><option>Volkswagen</option>
+                <option>Audi</option><option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-mileage">Mileage (km)</label>
+              <input class="form-control" id="f-mileage" type="number" placeholder="50000" min="0" max="500000"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-engine-temp">Engine Temperature (°C)</label>
+              <input class="form-control" id="f-engine-temp" type="number" placeholder="90" min="50" max="150"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-oil">Oil Quality (0-100%)</label>
+              <input class="form-control" id="f-oil" type="number" placeholder="80" min="0" max="100"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-tire">Tire Pressure (PSI)</label>
+              <input class="form-control" id="f-tire" type="number" placeholder="32" min="15" max="60"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-brake">Brake Condition (0-100%)</label>
+              <input class="form-control" id="f-brake" type="number" placeholder="75" min="0" max="100"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-battery">Battery Health (0-100%)</label>
+              <input class="form-control" id="f-battery" type="number" placeholder="85" min="0" max="100"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-fuel">Fuel Efficiency (km/L)</label>
+              <input class="form-control" id="f-fuel" type="number" placeholder="30" min="1" max="80"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-service-hist">Service History (count)</label>
+              <input class="form-control" id="f-service-hist" type="number" placeholder="3" min="0" max="50"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="f-last-service">Last Service Date</label>
+              <input class="form-control" id="f-last-service" type="date"/>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+            <button class="btn-primary" onclick="submitPrediction()">⚡ Analyze Vehicle</button>
+            <button class="btn-secondary" onclick="fillSample('good')">Fill: Good Vehicle</button>
+            <button class="btn-secondary" onclick="fillSample('bad')">Fill: Critical Vehicle</button>
+            <button class="btn-secondary" onclick="resetForm()">Clear Form</button>
+          </div>
+        </div>
+
+        <!-- PREDICTION RESULT -->
+        <div>
+          <div class="glass-card" style="padding:20px;margin-bottom:16px;" id="prediction-result-card">
+            <div class="section-title" style="margin-bottom:16px;">AI Prediction Output</div>
+            <div id="prediction-placeholder" style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding:40px 20px;">
+              <div style="font-size:3rem;margin-bottom:12px;">🤖</div>
+              Enter vehicle data and click<br/><strong style="color:var(--neon-blue);">Analyze Vehicle</strong> to see results.
+            </div>
+            <div id="prediction-output" style="display:none;">
+              <div class="health-gauge-wrap" style="margin-bottom:20px;">
+                <div class="gauge-ring">
+                  <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle class="gauge-bg" cx="80" cy="80" r="65"/>
+                    <circle class="gauge-fill" id="pred-gauge-fill" cx="80" cy="80" r="65" stroke="url(#predGrad)" stroke-dasharray="408.41" stroke-dashoffset="408.41"/>
+                    <defs>
+                      <linearGradient id="predGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#8b5cf6"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div class="gauge-center">
+                    <div class="gauge-value" id="pred-health-val" style="color:var(--neon-blue);">--</div>
+                    <div class="gauge-label">Health Score</div>
+                  </div>
+                </div>
+              </div>
+              <div class="result-list" id="result-list"></div>
+            </div>
+          </div>
+
+          <!-- Recommendations -->
+          <div class="glass-card" style="padding:20px;" id="rec-card">
+            <div class="section-title" style="margin-bottom:14px;">Smart Recommendations</div>
+            <div id="rec-list">
+              <div style="color:var(--text-secondary);font-size:0.82rem;text-align:center;padding:20px;">Recommendations appear after analysis.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ ANALYTICS SECTION ══ -->
+    <section id="section-analytics" style="display:none;">
+      <div class="section-header" style="margin-bottom:20px;">
+        <div style="font-family:'Orbitron',monospace;font-size:1.1rem;color:var(--neon-blue);">Analytics Dashboard</div>
+      </div>
+      <div class="two-col" style="margin-bottom:20px;">
+        <div class="glass-card" style="padding:20px;">
+          <div class="section-title" style="margin-bottom:14px;">Engine Temperature Trend</div>
+          <div class="chart-container tall"><canvas id="chart-engine"></canvas></div>
+        </div>
+        <div class="glass-card" style="padding:20px;">
+          <div class="section-title" style="margin-bottom:14px;">Battery Health Trend</div>
+          <div class="chart-container tall"><canvas id="chart-battery"></canvas></div>
+        </div>
+      </div>
+      <div class="two-col" style="margin-bottom:20px;">
+        <div class="glass-card" style="padding:20px;">
+          <div class="section-title" style="margin-bottom:14px;">Fuel Efficiency Trend</div>
+          <div class="chart-container tall"><canvas id="chart-fuel"></canvas></div>
+        </div>
+        <div class="glass-card" style="padding:20px;">
+          <div class="section-title" style="margin-bottom:14px;">Failure Probability</div>
+          <div class="chart-container tall"><canvas id="chart-failure"></canvas></div>
+        </div>
+      </div>
+      <div class="glass-card" style="padding:20px;">
+        <div class="section-title" style="margin-bottom:14px;">Maintenance History Timeline</div>
+        <div class="timeline" id="analytics-timeline">
+          <div style="color:var(--text-secondary);font-size:0.82rem;">Loading timeline...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ VEHICLES SECTION ══ -->
+    <section id="section-vehicles" style="display:none;">
+      <div class="section-header" style="margin-bottom:20px;">
+        <div style="font-family:'Orbitron',monospace;font-size:1.1rem;color:var(--neon-blue);">My Vehicles</div>
+        <button class="btn-primary" onclick="showSection('predict')" style="font-size:0.82rem;padding:8px 18px;">+ Add New Vehicle</button>
+      </div>
+      <div id="vehicles-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">
+        <div style="color:var(--text-secondary);font-size:0.85rem;padding:20px;">Loading vehicles...</div>
+      </div>
+    </section>
+
+    <!-- ══ RECOMMENDATIONS SECTION ══ -->
+    <section id="section-recommendations" style="display:none;">
+      <div class="section-header" style="margin-bottom:20px;">
+        <div style="font-family:'Orbitron',monospace;font-size:1.1rem;color:var(--neon-blue);">Smart Recommendations</div>
+      </div>
+      <div id="all-recommendations">
+        <div style="color:var(--text-secondary);font-size:0.85rem;">Select a vehicle and run a prediction to see recommendations.</div>
+      </div>
+    </section>
+
+    <!-- ══ HISTORY SECTION ══ -->
+    <section id="section-history" style="display:none;">
+      <div class="section-header" style="margin-bottom:20px;">
+        <div style="font-family:'Orbitron',monospace;font-size:1.1rem;color:var(--neon-blue);">Prediction History</div>
+      </div>
+      <div class="glass-card" style="padding:20px;">
+        <div id="history-list">
+          <div style="color:var(--text-secondary);font-size:0.82rem;text-align:center;padding:30px;">Select a vehicle to view its prediction history.</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- CHATBOT -->
+<div class="chatbot-widget">
+  <div class="chatbot-window" id="chatbot-window">
+    <div class="chatbot-header">
+      <div class="chatbot-avatar">🤖</div>
+      <div>
+        <div class="chatbot-name">VMPS AI Assistant</div>
+        <div class="chatbot-status">● Online</div>
+      </div>
+      <button onclick="toggleChatbot()" style="margin-left:auto;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1rem;">✕</button>
+    </div>
+    <div class="chatbot-messages" id="chatbot-messages">
+      <div class="msg msg-bot">Hello! I'm your VMPS AI Assistant. Ask me about vehicle maintenance, oil changes, brake conditions, battery health, or anything else! 🚗</div>
+    </div>
+    <div class="chatbot-input-row">
+      <input class="chatbot-input" id="chatbot-input" type="text" placeholder="Ask about maintenance..." onkeydown="if(event.key==='Enter')sendChat()"/>
+      <button class="chatbot-send" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+  <button class="chatbot-toggle" onclick="toggleChatbot()" title="AI Assistant">🤖</button>
+</div>
+
+<script src="/static/js/particles.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/main.js"></script>
+</body>
+</html>
