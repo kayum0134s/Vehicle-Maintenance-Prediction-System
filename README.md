@@ -7,7 +7,7 @@
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.5-orange?style=flat-square)
 ![SQLite](https://img.shields.io/badge/Database-SQLite-lightgrey?style=flat-square)
 
----
+----
 
 ## ✨ Features
 
