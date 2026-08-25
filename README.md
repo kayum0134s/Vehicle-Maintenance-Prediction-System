@@ -41,7 +41,7 @@ python app.py
 Open: **http://localhost:5000**  
 Login: **admin@vmps.ai** / **admin123**
 
----
+----
 
 ## 📁 Project Structure
 
