@@ -160,8 +160,9 @@ def _seed_demo_data(app):
         print("[INFO] Login: admin@vmps.ai / admin123")
 
 
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
     print("[VMPS] Vehicle Maintenance Prediction System starting...")
     print("[VMPS] Open browser at: http://localhost:5000")
     print("[VMPS] Demo login: admin@vmps.ai / admin123")
