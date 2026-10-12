@@ -4,7 +4,7 @@ color 0B
 echo.
 echo  =====================================================
 echo   VMPS — Vehicle Maintenance Prediction System
-echo   AI-Powered   Flask   scikit-learn   SQLite
+echo   AI-Powered   Flask   scikit-learn   PostgreSQL / SQLite
 echo  =====================================================
 echo.
 cd /d "%~dp0"
@@ -15,7 +15,7 @@ if errorlevel 1 (
     pause & exit /b 1
 )
 echo [2/3] Installing dependencies...
-pip install -r requirements.txt --quiet
+python -m pip install -r requirements.txt --quiet
 echo [3/3] Launching VMPS...
 echo.
 echo  App URL: http://localhost:5000

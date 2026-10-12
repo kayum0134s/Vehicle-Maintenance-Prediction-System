@@ -42,6 +42,7 @@ class Vehicle(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     predictions = db.relationship('Prediction', backref='vehicle', lazy=True)
+    alerts = db.relationship('Alert', backref='vehicle', lazy=True)
 
     def to_dict(self):
         return {

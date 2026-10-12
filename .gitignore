@@ -25,6 +25,8 @@ env/
 
 # Environment variables (sensitive)
 .env
+.env.*
+!.env.example
 
 # Flask / SQLite
 instance/

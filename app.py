@@ -3,12 +3,10 @@ Vehicle Maintenance Prediction System
 Flask Application Entry Point
 """
 import os
-import sys
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-
+# pyrefly: ignore [missing-import]
 from flask import Flask, render_template, redirect, url_for, session
 from flask_cors import CORS
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 from config import Config
@@ -19,12 +17,30 @@ from routes.api import api
 load_dotenv()
 
 
-def create_app():
+def create_app(config_object=None):
     app = Flask(__name__)
-    app.config.from_object(Config)
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    if config_object:
+        app.config.from_object(config_object)
+        if hasattr(config_object, 'init_app'):
+            config_object.init_app(app)
+        else:
+            app.config.setdefault('SQLALCHEMY_TRACK_MODIFICATIONS', False)
+            app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
+    else:
+        # Apply validated configuration exactly once before initializing extensions
+        Config.init_app(app)
 
     CORS(app, supports_credentials=True)
+
+    # Prevent SQLite from being initialized on Vercel.
+    database_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    if os.environ.get('VERCEL') == '1' and database_uri.startswith('sqlite'):
+        raise RuntimeError(
+            "Vercel is configured to use SQLite. "
+            "Set DATABASE_URL to your Supabase PostgreSQL connection string "
+            "in Vercel Project Settings > Environment Variables, then redeploy."
+        )
+
     db.init_app(app)
 
     app.register_blueprint(auth)
@@ -42,15 +58,56 @@ def create_app():
             return redirect(url_for('index'))
         return render_template('login.html')
 
-    with app.app_context():
-        db.create_all()
+    @app.route('/api/health', methods=['GET'])
+    def health_check():
+        """Health check endpoint for Vercel deployment and monitoring."""
+        db_connected = False
+        dialect = 'unknown'
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('SELECT 1'))
+            db_connected = True
+            dialect = db.engine.dialect.name
+        except Exception:
+            db_connected = False
+            if hasattr(db, 'engine') and db.engine:
+                try:
+                    dialect = db.engine.dialect.name
+                except Exception:
+                    dialect = 'uninitialized'
+
+        return {
+            'status': 'healthy' if db_connected else 'degraded',
+            'database': 'connected' if db_connected else 'disconnected',
+            'dialect': dialect
+        }, (200 if db_connected else 503)
+
+    @app.cli.command("init-db")
+    def init_db_cmd():
+        """Create database tables idempotently."""
+        init_db(app)
+        print("[OK] Database tables created successfully.")
+
+    @app.cli.command("seed-demo")
+    def seed_demo_cmd():
+        """Seed demo user and vehicle data."""
         _seed_demo_data(app)
+        print("[OK] Demo data seeding completed.")
 
     return app
 
 
+def init_db(app_instance=None):
+    """Safely and idempotently create database tables."""
+    target_app = app_instance or app
+    with target_app.app_context():
+        db.create_all()
+
+
 def _seed_demo_data(app):
     """Seed realistic demo vehicles for demonstration."""
+    
+    # pyrefly: ignore [missing-import]
     from werkzeug.security import generate_password_hash
     from models.ml_engine import ml_engine
     import json, random
@@ -163,7 +220,14 @@ def _seed_demo_data(app):
 app = create_app()
 
 if __name__ == '__main__':
+    with app.app_context():
+        try:
+            init_db(app)
+            _seed_demo_data(app)
+        except Exception as e:
+            print(f"[WARN] Local startup database check: {e}")
+
     print("[VMPS] Vehicle Maintenance Prediction System starting...")
     print("[VMPS] Open browser at: http://localhost:5000")
     print("[VMPS] Demo login: admin@vmps.ai / admin123")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=app.config.get('DEBUG', False), host='0.0.0.0', port=5000)

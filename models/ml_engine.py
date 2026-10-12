@@ -2,6 +2,7 @@
 Vehicle Maintenance Prediction ML Engine
 Uses Random Forest, Decision Tree, and Gradient Boosting
 """
+# pyrefly: ignore [missing-import]
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
